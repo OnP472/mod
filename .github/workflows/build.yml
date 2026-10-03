@@ -11,17 +11,63 @@ jobs:
         with:
           distribution: temurin
           java-version: 8
-      - name: Install Gradle 4.9
+      - name: Install Gradle 4.10.3
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-4.9-bin.zip
-          unzip -q gradle-4.9-bin.zip -d $HOME
-          echo "$HOME/gradle-4.9/bin" >> $GITHUB_PATH
+          wget -q https://services.gradle.org/distributions/gradle-4.10.3-bin.zip
+          unzip -q gradle-4.10.3-bin.zip -d $HOME
+          echo "$HOME/gradle-4.10.3/bin" >> $GITHUB_PATH
       - name: Unzip project
         run: unzip -o netherbackport-project.zip -d project
+      - name: Write build.gradle (ForgeGradle 3)
+        run: |
+          cat > project/build.gradle <<'EOF'
+          buildscript {
+              repositories {
+                  maven { url = 'https://maven.minecraftforge.net/' }
+                  mavenCentral()
+                  jcenter()
+              }
+              dependencies {
+                  classpath 'net.minecraftforge.gradle:ForgeGradle:3.+'
+              }
+          }
+          apply plugin: 'net.minecraftforge.gradle'
+
+          version = '1.0.0'
+          group = 'com.netherbackport'
+          archivesBaseName = 'netherbackport'
+          sourceCompatibility = targetCompatibility = '1.8'
+          compileJava {
+              sourceCompatibility = targetCompatibility = '1.8'
+          }
+
+          minecraft {
+              mappings channel: 'stable', version: '39-1.12'
+          }
+
+          dependencies {
+              minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
+          }
+
+          processResources {
+              inputs.property 'version', project.version
+              from(sourceSets.main.resources.srcDirs) {
+                  include 'mcmod.info'
+                  expand 'version': project.version, 'mcversion': '1.12.2'
+              }
+              from(sourceSets.main.resources.srcDirs) {
+                  exclude 'mcmod.info'
+              }
+          }
+
+          jar.finalizedBy('reobfJar')
+          EOF
       - name: Build
         working-directory: project
-        run: gradle setupCIWorkspace build --no-daemon --stacktrace
+        run: gradle build --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: netherbackport-jar
-          path: project/build/libs/*.jar
+          path: |
+            project/build/libs/*.jar
+            project/build/reobfJar/*.jar
